@@ -805,6 +805,14 @@ def analyze_system_word(sys_word):
         categories = ["disease", "epidemic_disease", "global", "health_threat"]  # Înlocuiește categoriile existente
     elif sys_word_lower in ["elephant", "butterfly", "eagle", "shark"]:
         categories.append("animal")  # Asigură-te că sunt categorizate ca animale
+    # Adaugă cazul special pentru "broom"
+    elif sys_word_lower == "broom":
+        categories.append("wood_object")  # Adaugă categorie specială pentru obiecte din lemn
+        materials.append("wood")  # Marchează explicit ca fiind din lemn
+    # Adaugă cazul special pentru "cup"
+    elif sys_word_lower == "cup":
+        categories.append("small_breakable")  # Adaugă categorie pentru obiecte mici care pot fi sparte
+        size = "small"  # Asigură-te că este marcat ca mic
     
     return {
         "categories": categories,
@@ -854,6 +862,21 @@ def what_beats(sys_word):
     # Ensure words have been categorized
     if not PLAYER_WORDS[1].get("categories"):
         categorize_player_words()
+    
+    # Cazuri speciale pentru cuvinte specifice
+    if sys_word.lower() == "broom":
+        # Pentru mătură, preferăm "Flame" pentru că e din lemn
+        for word_id, info in PLAYER_WORDS.items():
+            if info["text"] == "Flame":
+                print(f"Special case: 'Broom' detected - using Flame")
+                return word_id
+    
+    elif sys_word.lower() == "cup":
+        # Pentru ceașcă, preferăm "Rock" sau "Stone" pentru că e un obiect mic și fragil
+        for word_id, info in PLAYER_WORDS.items():
+            if info["text"] in ["Rock", "Stone"]:
+                print(f"Special case: 'Cup' detected - using {info['text']}")
+                return word_id
     
     # Analyze system word
     sys_word_analysis = analyze_system_word(sys_word)
@@ -911,12 +934,16 @@ def what_beats(sys_word):
             wordnet_score
         )
         
-        # Adaugă cazurile speciale direct aici
-        if sys_word.lower() == "pandemic":
-            if player_word == "Vaccine":
-                word_scores[word_id] *= 5.0  # Prioritate mare pentru Vaccine
-            elif player_word == "Cure":
-                word_scores[word_id] *= 3.0  # Cure rămâne a doua opțiune
+        # Cazuri speciale pentru cuvinte specifice
+        if sys_word.lower() == "broom":
+            if player_word == "Flame":
+                word_scores[word_id] *= 5.0  # Boost major pentru Flame împotriva Broom
+            elif player_word == "Fire":
+                word_scores[word_id] *= 4.0  # Boost mare pentru Fire împotriva Broom
+        
+        elif sys_word.lower() == "cup":
+            if player_word in ["Rock", "Stone"]:
+                word_scores[word_id] *= 5.0  # Boost major pentru Rock/Stone împotriva Cup
         
         # Apply category-specific strength modifiers
         category_strength = 0
@@ -1214,49 +1241,35 @@ def play_game(player_id=PLAYER_ID):
         
     print(f"Jucătorul {player_id} începe jocul...")
     
-    # Încercări maxime pentru request-uri eșuate
-    MAX_RETRIES = 5
-    
     for round_id in range(1, NUM_ROUNDS + 1):
         round_num = -1
-        retries = 0
-        
         while round_num != round_id:
             try:
                 response = requests.get(get_url)
                 response_data = response.json()
-                print(f"[Round {round_id}] Response from get-word: {response_data}")
+                print(f"Response from get-word: {response_data}")
                 
-                # Verifică structura răspunsului
+                # Verifică structura răspunsului - ajustează dacă este necesar
                 if 'word' in response_data:
                     sys_word = response_data['word']
                 else:
                     print(f"Warning: 'word' not found in response: {response_data}")
-                    sleep(3)
-                    retries += 1
+                    sleep(2)
                     continue
                     
                 if 'round' in response_data:
                     round_num = response_data['round']
                 else:
                     print(f"Warning: 'round' not found in response: {response_data}")
-                    sleep(3)
-                    retries += 1
+                    sleep(2)
                     continue
                 
                 if round_num != round_id:
                     print(f"Waiting for round {round_id}, current round is {round_num}")
-                    sleep(5)  # Așteaptă mai mult între verificări de runde
-                    retries = 0  # Resetăm contorul de încercări pentru noua rundă
+                    sleep(2)
             except Exception as e:
-                retries += 1
-                print(f"Error fetching word (attempt {retries}/{MAX_RETRIES}): {e}")
-                if retries >= MAX_RETRIES:
-                    print(f"Too many failed attempts. Waiting longer...")
-                    sleep(10)  # Așteaptă mai mult după mai multe eșecuri
-                    retries = 0
-                else:
-                    sleep(3)
+                print(f"Error fetching word: {e}")
+                sleep(2)
 
         # Verifică status-ul jocului
         try:
@@ -1296,15 +1309,24 @@ def play_game(player_id=PLAYER_ID):
 if __name__ == "__main__":
     print("WordNet-Enhanced Word Power Strategy")
     print("===========================================")
-    print(f"Starting game automatically with player ID: {PLAYER_ID}")
-    print(f"Connected to API at {BASE_URL}")
-    print(f"- Get Word URL: {get_url}")
-    print(f"- Submit Word URL: {post_url}") 
-    print(f"- Status URL: {status_url}")
-    print("===========================================")
+    print("1. Test against a variety of common words")
+    print("2. Test specific words")
+    print("3. Simulate a sample game")
+    print("4. Joacă în competiția live")
     
-    # Asigură-te că avem categoriile pregătite
-    categorize_player_words()
+    choice = input("\nAlege opțiunea (1-4): ").strip()
     
-    # Rulează jocul direct fără a mai cere input de la utilizator
-    play_game(PLAYER_ID)
+    if choice == "1":
+        test_strategy()
+    elif choice == "2":
+        test_specific_words()
+    elif choice == "3":
+        if not PLAYER_WORDS[1].get("categories"):
+            categorize_player_words()
+        simulate_game()
+    elif choice == "4":
+        # Folosește direct player ID-ul specificat
+        print(f"Starting game with player ID: {PLAYER_ID}")
+        play_game(PLAYER_ID)
+    else:
+        print("Opțiune invalidă. Ieșire.")

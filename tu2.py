@@ -1214,35 +1214,49 @@ def play_game(player_id=PLAYER_ID):
         
     print(f"Jucătorul {player_id} începe jocul...")
     
+    # Încercări maxime pentru request-uri eșuate
+    MAX_RETRIES = 5
+    
     for round_id in range(1, NUM_ROUNDS + 1):
         round_num = -1
+        retries = 0
+        
         while round_num != round_id:
             try:
                 response = requests.get(get_url)
                 response_data = response.json()
-                print(f"Response from get-word: {response_data}")
+                print(f"[Round {round_id}] Response from get-word: {response_data}")
                 
-                # Verifică structura răspunsului - ajustează dacă este necesar
+                # Verifică structura răspunsului
                 if 'word' in response_data:
                     sys_word = response_data['word']
                 else:
                     print(f"Warning: 'word' not found in response: {response_data}")
-                    sleep(2)
+                    sleep(3)
+                    retries += 1
                     continue
                     
                 if 'round' in response_data:
                     round_num = response_data['round']
                 else:
                     print(f"Warning: 'round' not found in response: {response_data}")
-                    sleep(2)
+                    sleep(3)
+                    retries += 1
                     continue
                 
                 if round_num != round_id:
                     print(f"Waiting for round {round_id}, current round is {round_num}")
-                    sleep(2)
+                    sleep(5)  # Așteaptă mai mult între verificări de runde
+                    retries = 0  # Resetăm contorul de încercări pentru noua rundă
             except Exception as e:
-                print(f"Error fetching word: {e}")
-                sleep(2)
+                retries += 1
+                print(f"Error fetching word (attempt {retries}/{MAX_RETRIES}): {e}")
+                if retries >= MAX_RETRIES:
+                    print(f"Too many failed attempts. Waiting longer...")
+                    sleep(10)  # Așteaptă mai mult după mai multe eșecuri
+                    retries = 0
+                else:
+                    sleep(3)
 
         # Verifică status-ul jocului
         try:
@@ -1282,24 +1296,15 @@ def play_game(player_id=PLAYER_ID):
 if __name__ == "__main__":
     print("WordNet-Enhanced Word Power Strategy")
     print("===========================================")
-    print("1. Test against a variety of common words")
-    print("2. Test specific words")
-    print("3. Simulate a sample game")
-    print("4. Joacă în competiția live")
+    print(f"Starting game automatically with player ID: {PLAYER_ID}")
+    print(f"Connected to API at {BASE_URL}")
+    print(f"- Get Word URL: {get_url}")
+    print(f"- Submit Word URL: {post_url}") 
+    print(f"- Status URL: {status_url}")
+    print("===========================================")
     
-    choice = input("\nAlege opțiunea (1-4): ").strip()
+    # Asigură-te că avem categoriile pregătite
+    categorize_player_words()
     
-    if choice == "1":
-        test_strategy()
-    elif choice == "2":
-        test_specific_words()
-    elif choice == "3":
-        if not PLAYER_WORDS[1].get("categories"):
-            categorize_player_words()
-        simulate_game()
-    elif choice == "4":
-        # Folosește direct player ID-ul specificat
-        print(f"Starting game with player ID: {PLAYER_ID}")
-        play_game(PLAYER_ID)
-    else:
-        print("Opțiune invalidă. Ieșire.")
+    # Rulează jocul direct fără a mai cere input de la utilizator
+    play_game(PLAYER_ID)
